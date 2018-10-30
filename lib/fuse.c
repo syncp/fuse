@@ -4001,7 +4001,7 @@ static int fill_dir(void *dh_, const char *name, const struct stat *statp,
 		if (dh->fuse->conf.readdir_ino) {
 			struct node *node;
 			pthread_mutex_lock(&dh->fuse->lock);
-			if (name[0] == "." && name[1] == 0) {
+			if (name[0] == '.' && name[1] == 0) {
 				stbuf.st_ino = dh->nodeid;
 			}
 			else {

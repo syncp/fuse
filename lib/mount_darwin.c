@@ -434,13 +434,13 @@ static int receive_fd(int sock_fd)
 	}
 	if (!rv) {
 		/* EOF */
+		fprintf(stderr, "fuse: receive_fd(%d) -> EOF\n", sock_fd);
 		return -1;
 	}
 
 	cmsg = CMSG_FIRSTHDR(&msg);
 	if (cmsg->cmsg_type != SCM_RIGHTS) {
-		fprintf(stderr, "got control message of unknown type %d\n",
-			cmsg->cmsg_type);
+		fprintf(stderr, "got control message of unknown type %d\n", cmsg->cmsg_type);
 		return -1;
 	}
 
@@ -475,7 +475,8 @@ fuse_mount_core(const char *mountpoint, const char *opts)
 	signal(SIGCHLD, SIG_DFL); /* So that we can wait4() below. */
 
 	if (getenv("FUSE_NO_MOUNT") || ! mountpoint) {
-		goto out;
+		fprintf(stderr, ! mountpoint ? "fuse: null mountpoint\n" : "fuse: FUSE_NO_MOUNT\n");
+		return -1;
 	}
 
 	mount_prog_path = fuse_resource_path(OSXFUSE_MOUNT_PROG);
@@ -486,14 +487,14 @@ fuse_mount_core(const char *mountpoint, const char *opts)
 
 	result = socketpair(AF_UNIX, SOCK_STREAM, 0, fds);
 	if (result == -1) {
-		fprintf(stderr, "fuse: socketpair() failed");
+		perror("fuse: socketpair() failed.");
 		return -1;
 	}
 
 	pid = fork();
 
 	if (pid == -1) {
-		perror("fuse: fork failed");
+		perror("fuse: 1st fork failed");
 		close(fds[0]);
 		close(fds[1]);
 		return -1;
@@ -503,7 +504,7 @@ fuse_mount_core(const char *mountpoint, const char *opts)
 		pid_t cpid = fork();
 
 		if (cpid == -1) {
-			perror("fuse: fork failed");
+			perror("fuse: 2nd fork failed");
 			close(fds[0]);
 			close(fds[1]);
 			_exit(1);
@@ -551,17 +552,11 @@ fuse_mount_core(const char *mountpoint, const char *opts)
 	fd = receive_fd(fds[1]);
 
 	if (waitpid(pid, &status, 0) == -1 || WEXITSTATUS(status) != 0) {
-		perror("fuse: failed to mount file system");
-		goto mount_err_out;
+		// Just log waitpid() failure. Don't exit with an error, as the result
+		// is defined by receive_fd().
+		perror("fuse: waitpid failed");
 	}
 
-	goto out;
-
-mount_err_out:
-	close(fd);
-	fd = -1;
-
-out:
 	return fd;
 }
 
